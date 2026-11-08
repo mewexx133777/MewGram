@@ -37,6 +37,8 @@ class SessionController;
 
 namespace Media::Player {
 
+class WavySeekBar;
+
 class Dropdown;
 class PlayButton;
 class SpeedButton;
@@ -156,7 +158,7 @@ private:
 	object_ptr<SpeedButton> _speedToggle;
 	object_ptr<Ui::IconButton> _close;
 	object_ptr<Ui::PlainShadow> _shadow = { nullptr };
-	object_ptr<Ui::FilledSlider> _playbackSlider;
+	object_ptr<WavySeekBar> _playbackSlider;
 	base::unique_qptr<Dropdown> _volume;
 	std::unique_ptr<View::PlaybackProgress> _playbackProgress;
 	std::unique_ptr<OrderController> _orderController;
