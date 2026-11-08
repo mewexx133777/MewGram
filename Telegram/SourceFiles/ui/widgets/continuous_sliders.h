@@ -135,13 +135,6 @@ class FilledSlider : public ContinuousSlider {
 public:
 	FilledSlider(QWidget *parent, const style::FilledSlider &st);
 
-	void setPlaying(bool playing) {
-		if (_playing != playing) {
-			_playing = playing;
-			update();
-		}
-	}
-
 protected:
 	void paintEvent(QPaintEvent *e) override;
 
@@ -150,9 +143,7 @@ private:
 	float64 getOverDuration() const override;
 
 	const style::FilledSlider &_st;
-	bool _playing = true;
-	float64 _wavePhase = 0.;
-	crl::time _lastWaveTime = 0;
+
 };
 
 class MediaSlider : public ContinuousSlider {
@@ -293,5 +284,3 @@ protected:
 };
 
 } // namespace Ui
-
-
