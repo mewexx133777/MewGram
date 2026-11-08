@@ -1329,6 +1329,30 @@ void BuildMaterialgramSection(SectionBuilder &builder) {
 	builder.addDivider();
 	builder.addSkip();
 	builder.addSubsectionTitle({
+		.id = u"advanced/mewgram"_q,
+		.title = rpl::single(u"MewGram & MD3 Player"_q),
+		.keywords = { u"mewgram"_q, u"player"_q, u"md3"_q },
+	});
+
+	const auto md3Player = builder.addButton({
+		.id = u"advanced/md3_player"_q,
+		.title = rpl::single(u"Material Design 3 Player (Wavy Wave)"_q),
+		.st = &st::settingsButtonNoIcon,
+		.toggled = rpl::single(settings->md3PlayerEnabled()),
+		.keywords = { u"mewgram"_q, u"player"_q, u"wavy"_q, u"md3"_q, u"wave"_q },
+	});
+	if (md3Player) {
+		md3Player->toggledValue(
+		) | rpl::filter([=](bool enabled) {
+			return (enabled != settings->md3PlayerEnabled());
+		}) | rpl::on_next([=](bool enabled) {
+			settings->setMd3PlayerEnabled(enabled);
+			Core::App().saveSettingsDelayed();
+		}, md3Player->lifetime());
+	}
+	builder.addDivider();
+	builder.addSkip();
+	builder.addSubsectionTitle({
 		.id = u"advanced/materialgram"_q,
 		.title = rpl::single(u"materialgram"_q),
 		.keywords = { u"materialgram"_q },
@@ -2122,3 +2146,5 @@ Type AdvancedId() {
 }
 
 } // namespace Settings
+
+

@@ -689,6 +689,7 @@ void Widget::handleSongUpdate(const TrackState &state) {
 	if (instance()->isSeeking(_type)) {
 		showPause = true;
 	}
+	_playbackSlider->setPlaying(showPause);
 	_playPause->setState(state.id.audio()->loading()
 		? PlayButton::State::Cancel
 		: showPause

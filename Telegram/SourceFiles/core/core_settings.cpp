@@ -310,6 +310,7 @@ QByteArray Settings::serialize() const {
 		size += Serialize::stringSize(id);
 	}
 	size += sizeof(qint32) // _trayIconMonochrome
+		+ sizeof(qint32) // _md3PlayerEnabled
 		+ sizeof(qint32) // _birthDateEnabled
 		+ sizeof(qint32) // _ttlVoiceClickTooltipHidden
 		+ Serialize::stringSize(_playbackDeviceId.current())
@@ -489,6 +490,7 @@ QByteArray Settings::serialize() const {
 		}
 		stream
 			<< qint32(_trayIconMonochrome.current() ? 1 : 0)
+			<< qint32(_md3PlayerEnabled.current() ? 1 : 0)
 			<< qint32(_birthDateEnabled.current() ? 1 : 0)
 			<< qint32(_ttlVoiceClickTooltipHidden.current() ? 1 : 0)
 			<< _playbackDeviceId.current()
@@ -654,6 +656,7 @@ void Settings::addFromSerialized(const QByteArray &serialized) {
 	qint32 storiesClickTooltipHidden = _storiesClickTooltipHidden.current() ? 1 : 0;
 	base::flat_set<QString> recentEmojiSkip;
 	qint32 trayIconMonochrome = (_trayIconMonochrome.current() ? 1 : 0);
+	qint32 md3PlayerEnabled = (_md3PlayerEnabled.current() ? 1 : 0);
 	qint32 birthDateEnabled = (_birthDateEnabled.current() ? 1 : 0);
 	qint32 ttlVoiceClickTooltipHidden = _ttlVoiceClickTooltipHidden.current() ? 1 : 0;
 	QByteArray ivPosition;
@@ -948,9 +951,11 @@ void Settings::addFromSerialized(const QByteArray &serialized) {
 		trayIconMonochrome = 0;
 	}
 	if (!stream.atEnd()) {
+		stream >> md3PlayerEnabled;
 		stream >> birthDateEnabled;
 	}
 	else {
+		md3PlayerEnabled = 1;
 		birthDateEnabled = 1;
 	}
 	if (!stream.atEnd()) {
@@ -1324,6 +1329,7 @@ void Settings::addFromSerialized(const QByteArray &serialized) {
 	_storiesClickTooltipHidden = (storiesClickTooltipHidden == 1);
 	_recentEmojiSkip = std::move(recentEmojiSkip);
 	_trayIconMonochrome = (trayIconMonochrome == 1);
+	_md3PlayerEnabled = (md3PlayerEnabled == 1);
 	_birthDateEnabled = (birthDateEnabled == 1);
 	_ttlVoiceClickTooltipHidden = (ttlVoiceClickTooltipHidden == 1);
 	if (!ivPosition.isEmpty()) {
@@ -2035,3 +2041,4 @@ void Settings::setQuickDialogAction(Dialogs::Ui::QuickDialogAction action) {
 }
 
 } // namespace Core
+

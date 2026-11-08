@@ -828,6 +828,15 @@ public:
 	[[nodiscard]] rpl::producer<bool> trayIconMonochromeChanges() const {
 		return _trayIconMonochrome.changes();
 	}
+	void setMd3PlayerEnabled(bool value) {
+		_md3PlayerEnabled = value;
+	}
+	[[nodiscard]] bool md3PlayerEnabled() const {
+		return _md3PlayerEnabled.current();
+	}
+	[[nodiscard]] rpl::producer<bool> md3PlayerEnabledChanges() const {
+		return _md3PlayerEnabled.changes();
+	}
 	void setBirthDateEnabled(bool value) {
 		_birthDateEnabled = value;
 	}
@@ -1195,6 +1204,7 @@ private:
 	base::flags<Calls::Group::StickedTooltip> _hiddenGroupCallTooltips;
 	CloseBehavior _closeBehavior = CloseBehavior::Quit;
 	rpl::variable<bool> _trayIconMonochrome = true;
+	rpl::variable<bool> _md3PlayerEnabled = true;
 	rpl::variable<bool> _birthDateEnabled = false;
 	rpl::variable<bool> _datacenterEnabled = false;
 	rpl::variable<bool> _gameeEnabled = false;
@@ -1258,4 +1268,5 @@ private:
 };
 
 } // namespace Core
+
 

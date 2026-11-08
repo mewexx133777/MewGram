@@ -6,6 +6,9 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "ui/widgets/continuous_sliders.h"
+#include "core/application.h"
+#include "core/core_settings.h"
+#include <cmath>
 
 #include "ui/painter.h"
 #include "ui/rect.h"
@@ -233,33 +236,115 @@ void FilledSlider::paintEvent(QPaintEvent *e) {
 	auto p = QPainter(this);
 	PainterHighQualityEnabler hq(p);
 
-	p.setPen(Qt::NoPen);
-
 	const auto masterOpacity = fadeOpacity();
 	const auto disabled = isDisabled();
 	const auto over = getCurrentOverFactor();
+	const auto seekRect = getSeekRect();
+	const auto value = getCurrentValue();
+	const auto from = float64(seekRect.x());
+	const auto end = float64(from + seekRect.width());
+	const auto mid = std::clamp(from + value * (end - from), from, end);
+
+	const auto md3Enabled = Core::App().settings().md3PlayerEnabled();
+
+	if (md3Enabled) {
+		const auto now = crl::now();
+		if (_lastWaveTime != 0 && _playing) {
+			const auto dt = std::min(float64(now - _lastWaveTime) / 1000.0, 0.05);
+			_wavePhase += dt * 3.5;
+			if (_wavePhase > 6283.18) {
+				_wavePhase -= 6283.18;
+			}
+		}
+		_lastWaveTime = now;
+
+		const auto centerY = float64(height()) / 2.0;
+		const auto activeColor = disabled ? _st.disabledFg->c : _st.activeFg->c;
+		const auto inactiveColor = _st.inactiveFg->c;
+
+		// 1. Draw inactive track (straight line on the right side)
+		if (end > mid + 2.0) {
+			p.setOpacity(masterOpacity * (0.35 + 0.65 * over));
+			QPen trackPen(inactiveColor);
+			trackPen.setWidthF(3.0);
+			trackPen.setCapStyle(Qt::RoundCap);
+			p.setPen(trackPen);
+			p.setBrush(Qt::NoBrush);
+			p.drawLine(QPointF(mid + 3.0, centerY), QPointF(end, centerY));
+		}
+
+		// 2. Draw active MD3 wave (sinusoidal animated wave on the left side)
+		if (mid > from) {
+			p.setOpacity(masterOpacity);
+			QPen wavePen(activeColor);
+			wavePen.setWidthF(3.2);
+			wavePen.setCapStyle(Qt::RoundCap);
+			p.setPen(wavePen);
+			p.setBrush(Qt::NoBrush);
+
+			const auto waveLength = 28.0;
+			const auto maxAmplitude = 2.4;
+			const auto factor = std::clamp(value < 0.08 ? (value / 0.08) : (value > 0.92 ? (1.0 - value) / 0.08 : 1.0), 0.0, 1.0);
+			const auto amplitude = _playing ? (maxAmplitude * factor) : 0.0;
+
+			if (amplitude < 0.25 || (mid - from) < 8.0) {
+				p.drawLine(QPointF(from, centerY), QPointF(mid, centerY));
+			} else {
+				QPainterPath path;
+				const auto startY = centerY + std::sin((from * (6.2831853 / waveLength)) + _wavePhase) * amplitude;
+				path.moveTo(from, startY);
+				const auto step = 2.0;
+				for (auto x = from + step; x < mid; x += step) {
+					const auto y = centerY + std::sin((x * (6.2831853 / waveLength)) + _wavePhase) * amplitude;
+					path.lineTo(x, y);
+				}
+				const auto finalY = centerY + std::sin((mid * (6.2831853 / waveLength)) + _wavePhase) * amplitude;
+				path.lineTo(mid, finalY);
+				p.drawPath(path);
+			}
+		}
+
+		// 3. Draw MD3 Pill Handle at 'mid' position
+		{
+			p.setOpacity(masterOpacity);
+			p.setPen(Qt::NoPen);
+			p.setBrush(activeColor);
+			const auto handleWidth = 4.0 + (over * 1.5);
+			const auto handleHeight = 12.0 + (over * 2.0);
+			const auto handleRect = QRectF(mid - handleWidth / 2.0, centerY - handleHeight / 2.0, handleWidth, handleHeight);
+			p.drawRoundedRect(handleRect, handleWidth / 2.0, handleWidth / 2.0);
+		}
+
+		// Schedule next frame animation if playing
+		if (_playing && isVisible()) {
+			update();
+		}
+		return;
+	}
+
+	// Classic Telegram Desktop slider behavior
+	p.setPen(Qt::NoPen);
 	const auto lineWidth = _st.lineWidth + ((_st.fullWidth - _st.lineWidth) * over);
 	const auto lineWidthRounded = std::floor(lineWidth);
 	const auto lineWidthPartial = lineWidth - lineWidthRounded;
-	const auto seekRect = getSeekRect();
-	const auto value = getCurrentValue();
-	const auto from = seekRect.x();
-	const auto mid = int(base::SafeRound(from + value * seekRect.width()));
-	const auto end = from + seekRect.width();
-	if (mid > from) {
+	const auto midInt = int(base::SafeRound(mid));
+	const auto fromInt = int(base::SafeRound(from));
+	const auto endInt = int(base::SafeRound(end));
+
+	if (midInt > fromInt) {
 		p.setOpacity(masterOpacity);
-		p.fillRect(from, height() - lineWidthRounded, (mid - from), lineWidthRounded, disabled ? _st.disabledFg : _st.activeFg);
+		p.fillRect(fromInt, height() - lineWidthRounded, (midInt - fromInt), lineWidthRounded, disabled ? _st.disabledFg : _st.activeFg);
 		if (lineWidthPartial > 0.01) {
 			p.setOpacity(masterOpacity * lineWidthPartial);
-			p.fillRect(from, height() - lineWidthRounded - 1, (mid - from), 1, disabled ? _st.disabledFg : _st.activeFg);
+			p.fillRect(fromInt, height() - lineWidthRounded - 1, (midInt - fromInt), 1, disabled ? _st.disabledFg : _st.activeFg);
 		}
 	}
-	if (end > mid && over > 0) {
+	if (endInt > midInt && over > 0) {
 		p.setOpacity(masterOpacity * over);
-		p.fillRect(mid, height() - lineWidthRounded, (end - mid), lineWidthRounded, _st.inactiveFg);
+		p.fillRect(midInt, height() - lineWidthRounded, (endInt - midInt), lineWidthRounded, _st.inactiveFg);
 		if (lineWidthPartial > 0.01) {
 			p.setOpacity(masterOpacity * over * lineWidthPartial);
-			p.fillRect(mid, height() - lineWidthRounded - 1, (end - mid), 1, _st.inactiveFg);
+			p.fillRect(midInt, height() - lineWidthRounded - 1, (endInt - midInt), 1, _st.inactiveFg);
 		}
 	}
 }
@@ -568,3 +653,4 @@ void MediaSlider::paintEvent(QPaintEvent *e) {
 }
 
 } // namespace Ui
+
