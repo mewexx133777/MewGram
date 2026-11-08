@@ -61,10 +61,10 @@ BEGIN
         BLOCK "040904b0"
         BEGIN
             VALUE "CompanyName", "kukuruzka"
-            VALUE "FileDescription", "materialgram"
+            VALUE "FileDescription", "MewGram"
             VALUE "FileVersion", "7.3.1.1"
             VALUE "LegalCopyright", "github.com/kukuruzka165/materialgram"
-            VALUE "ProductName", "materialgram"
+            VALUE "ProductName", "MewGram"
             VALUE "ProductVersion", "7.3.1.1"
         END
     END

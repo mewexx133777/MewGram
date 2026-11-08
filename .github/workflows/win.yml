@@ -123,7 +123,7 @@ jobs:
       - name: Read configuration matrix.
         shell: bash
         run: |
-          ARTIFACT_NAME="materialgram"
+          ARTIFACT_NAME="MewGram"
 
           ARCH=""
           if [ -n "${{ matrix.arch }}" ]; then
@@ -184,7 +184,7 @@ jobs:
         run: |
           set OUT=%TBUILD%\%REPO_NAME%\out\MinSizeRel
           mkdir artifact
-          move %OUT%\materialgram.exe artifact/
+          move %OUT%\MewGram.exe artifact/
           move %OUT%\Updater.exe artifact/
       - uses: actions/upload-artifact@v7
         name: Upload artifact.

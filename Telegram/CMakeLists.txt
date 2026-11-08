@@ -2537,7 +2537,7 @@ endif()
 if (build_macstore)
     set(bundle_identifier "io.github.kukuruzka165.materialgram")
     set(bundle_entitlements "materialgram.entitlements")
-    set(output_name "materialgram")
+    set(output_name "MewGram")
     target_link_options(Telegram
     PRIVATE
         -F${libs_loc}/breakpad/src/client/mac/build/Release
@@ -2558,7 +2558,7 @@ else()
         set(bundle_identifier "io.github.kukuruzka165.materialgram")
     endif()
     set(bundle_entitlements "Telegram.entitlements")
-    set(output_name "materialgram")
+    set(output_name "MewGram")
 endif()
 
 if (CMAKE_GENERATOR STREQUAL Xcode)
@@ -2604,7 +2604,7 @@ get_property(is_multi_config GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
 if (APPLE
     OR is_multi_config
     OR NOT CMAKE_EXECUTABLE_SUFFIX STREQUAL ""
-    OR NOT "${output_name}" STREQUAL "materialgram")
+    OR NOT "${output_name}" STREQUAL "MewGram")
     set(output_folder ${CMAKE_BINARY_DIR})
 else()
     set(output_folder ${CMAKE_BINARY_DIR}/bin)
