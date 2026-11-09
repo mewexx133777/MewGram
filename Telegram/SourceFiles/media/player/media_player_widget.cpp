@@ -77,73 +77,114 @@ protected:
 		const auto mid = std::clamp(from + value * (end - from), from, end);
 
 		const auto now = crl::now();
-		if (_lastWaveTime != 0 && _playing) {
-			const auto dt = std::min(float64(now - _lastWaveTime) / 1000.0, 0.05);
-			_wavePhase += dt * 3.5;
+		const auto dt = (_lastFrameTime != 0)
+			? std::min(float64(now - _lastFrameTime) / 1000.0, 0.05)
+			: 0.016;
+		_lastFrameTime = now;
+
+		// Smooth spring-like transition for wave amplitude (play -> wave appears, pause -> smoothly straightens)
+		const auto targetAmpProgress = _playing ? 1.0 : 0.0;
+		const auto ampSpeed = 6.0; // ~250ms smooth transition
+		if (_currentAmpProgress < targetAmpProgress) {
+			_currentAmpProgress = std::min(targetAmpProgress, _currentAmpProgress + dt * ampSpeed);
+		} else if (_currentAmpProgress > targetAmpProgress) {
+			_currentAmpProgress = std::max(targetAmpProgress, _currentAmpProgress - dt * ampSpeed);
+		}
+
+		// Phase animation: continues moving while playing or while wave is flattening
+		if (_currentAmpProgress > 0.001) {
+			_wavePhase += dt * 45.0; // 45.0 px/s phase speed from MaterialProgress.hpp
 			if (_wavePhase > 6283.18) {
 				_wavePhase -= 6283.18;
 			}
 		}
-		_lastWaveTime = now;
 
-		const auto centerY = float64(height()) / 2.0;
+		const auto centerY = float64(height()) - 5.0; // Align nicely near bottom
 		const auto activeColor = disabled ? _st.disabledFg->c : _st.activeFg->c;
 		const auto inactiveColor = _st.inactiveFg->c;
 
-		// Inactive straight track (right side)
-		if (end > mid + 2.0) {
+		// 1. Draw straight Track with gap
+		const auto gapSize = 5.0;
+		const auto trackStart = mid + gapSize;
+		const auto stopDotRadius = 2.5;
+		const auto trackEnd = end - (stopDotRadius * 2.0 + 3.0);
+
+		if (trackEnd > trackStart + 2.0) {
 			p.setOpacity(masterOpacity * (0.35 + 0.65 * over));
 			QPen trackPen(inactiveColor);
-			trackPen.setWidthF(3.0);
+			trackPen.setWidthF(3.5);
 			trackPen.setCapStyle(Qt::RoundCap);
 			p.setPen(trackPen);
 			p.setBrush(Qt::NoBrush);
-			p.drawLine(QPointF(mid + 3.0, centerY), QPointF(end, centerY));
+			p.drawLine(QPointF(trackStart, centerY), QPointF(trackEnd, centerY));
 		}
 
-		// Active MD3 sinusoidal wave (left side)
-		if (mid > from) {
+		// Stop indicator (Material Design 3 dot at the end)
+		{
+			p.setOpacity(masterOpacity * (0.45 + 0.55 * over));
+			p.setPen(Qt::NoPen);
+			p.setBrush(inactiveColor);
+			p.drawEllipse(QPointF(end - stopDotRadius - 1.0, centerY), stopDotRadius, stopDotRadius);
+		}
+
+		// 2. Draw Active Wavy Segment (10dp peak-to-peak amplitude = 5.0px wave amplitude)
+		if (mid > from + 1.0) {
 			p.setOpacity(masterOpacity);
 			QPen wavePen(activeColor);
-			wavePen.setWidthF(3.2);
+			wavePen.setWidthF(3.6);
 			wavePen.setCapStyle(Qt::RoundCap);
+			wavePen.setLineJoin(Qt::RoundJoin);
 			p.setPen(wavePen);
 			p.setBrush(Qt::NoBrush);
 
-			const auto waveLength = 28.0;
-			const auto maxAmplitude = 2.4;
-			const auto factor = std::clamp(value < 0.08 ? (value / 0.08) : (value > 0.92 ? (1.0 - value) / 0.08 : 1.0), 0.0, 1.0);
-			const auto amplitude = _playing ? (maxAmplitude * factor) : 0.0;
+			// Material Design 3 wavelength and base amplitude (10dp expressive)
+			const auto wavelength = 36.0;
+			const auto baseAmplitude = 4.8; // ~10dp peak-to-peak
 
-			if (amplitude < 0.25 || (mid - from) < 8.0) {
+			// Smooth edge tapering so wave connects seamlessly to origin and handle
+			auto ampFactor = 1.0;
+			if (value < 0.12) {
+				ampFactor = std::max(0.0, value / 0.12);
+			} else if (value > 0.92) {
+				ampFactor = std::max(0.0, (1.0 - value) / 0.08);
+			}
+
+			// Combined amplitude with play/pause transition animation
+			const auto amplitude = baseAmplitude * ampFactor * _currentAmpProgress;
+
+			if (amplitude < 0.2 || (mid - from) < 6.0) {
 				p.drawLine(QPointF(from, centerY), QPointF(mid, centerY));
 			} else {
 				QPainterPath path;
-				const auto startY = centerY + std::sin((from * (6.2831853 / waveLength)) + _wavePhase) * amplitude;
-				path.moveTo(from, startY);
-				const auto step = 2.0;
-				for (auto x = from + step; x < mid; x += step) {
-					const auto y = centerY + std::sin((x * (6.2831853 / waveLength)) + _wavePhase) * amplitude;
-					path.lineTo(x, y);
+				const auto steps = std::max(12, int((mid - from) / 1.5));
+				for (int i = 0; i <= steps; ++i) {
+					const auto px = from + (mid - from) * (float64(i) / steps);
+					const auto sinVal = std::sin((2.0 * 3.1415926535 * (px - from - _wavePhase)) / wavelength);
+					const auto py = centerY + amplitude * sinVal;
+					if (i == 0) {
+						path.moveTo(px, py);
+					} else {
+						path.lineTo(px, py);
+					}
 				}
-				const auto finalY = centerY + std::sin((mid * (6.2831853 / waveLength)) + _wavePhase) * amplitude;
-				path.lineTo(mid, finalY);
 				p.drawPath(path);
 			}
 		}
 
-		// MD3 Pill handle
+		// 3. Material Design 3 Pill handle
 		{
 			p.setOpacity(masterOpacity);
 			p.setPen(Qt::NoPen);
 			p.setBrush(activeColor);
-			const auto handleWidth = 4.0 + (over * 1.5);
-			const auto handleHeight = 12.0 + (over * 2.0);
+			const auto handleWidth = 4.0 + (over * 2.0);
+			const auto handleHeight = 12.0 + (over * 3.0);
 			const auto handleRect = QRectF(mid - handleWidth / 2.0, centerY - handleHeight / 2.0, handleWidth, handleHeight);
 			p.drawRoundedRect(handleRect, handleWidth / 2.0, handleWidth / 2.0);
 		}
 
-		if (_playing && isVisible()) {
+		// Continuous animation while playing OR while transition is in progress
+		const auto animating = (_playing && isVisible()) || (_currentAmpProgress > 0.001 && _currentAmpProgress < 0.999);
+		if (animating) {
 			update();
 		}
 	}
@@ -152,9 +193,9 @@ private:
 	const style::FilledSlider &_st;
 	bool _playing = true;
 	float64 _wavePhase = 0.;
-	crl::time _lastWaveTime = 0;
+	float64 _currentAmpProgress = 1.0; // 0.0 (straight) .. 1.0 (full wave)
+	crl::time _lastFrameTime = 0;
 };
-
 
 Widget::Widget(
 	QWidget *parent,
@@ -536,11 +577,12 @@ void Widget::updateControlsGeometry() {
 
 	updatePlayPrevNextPositions();
 
+	const auto sliderH = Core::App().settings().md3PlayerEnabled() ? 16 : st::mediaPlayerPlayback.fullWidth;
 	_playbackSlider->setGeometry(
 		0,
-		height() - st::mediaPlayerPlayback.fullWidth,
+		height() - sliderH,
 		width(),
-		st::mediaPlayerPlayback.fullWidth);
+		sliderH);
 
 	updateDropdownsGeometry();
 }
