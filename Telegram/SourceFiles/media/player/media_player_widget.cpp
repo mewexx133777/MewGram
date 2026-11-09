@@ -133,7 +133,7 @@ protected:
 			QPen wavePen(activeColor);
 			wavePen.setWidthF(3.6);
 			wavePen.setCapStyle(Qt::RoundCap);
-			wavePen.setLineJoin(Qt::RoundJoin);
+			wavePen.setJoinStyle(Qt::RoundJoin);
 			p.setPen(wavePen);
 			p.setBrush(Qt::NoBrush);
 
