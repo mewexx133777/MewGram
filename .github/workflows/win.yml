@@ -30,12 +30,6 @@ jobs:
         shell: cmd
 
     steps:
-      - name: Free up runner disk space.
-        uses: hugoalh/disk-space-optimizer-ghaction@v0.8.1
-        with:
-          operate_async: "True"
-          general_include: ".+"
-          general_exclude: "^(VisualStudio/(2022|All)|DotNet|VCPkg)"
 
       - name: Enlarge pagefile.
         uses: al-cheb/configure-pagefile-action@v1.5
