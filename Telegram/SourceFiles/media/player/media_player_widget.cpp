@@ -65,6 +65,8 @@ protected:
 		}
 
 		auto p = QPainter(this);
+		// Fill background first so no #272823 parent paint shows through gaps
+		p.fillRect(rect(), st::mediaPlayerBg);
 		PainterHighQualityEnabler hq(p);
 
 		const auto masterOpacity = fadeOpacity();
@@ -577,10 +579,17 @@ void Widget::updateControlsGeometry() {
 
 	updatePlayPrevNextPositions();
 
-	const auto sliderH = Core::App().settings().md3PlayerEnabled() ? 16 : st::mediaPlayerPlayback.fullWidth;
+	// In MD3 mode the slider covers the full player widget so the parent background
+	// (#272823) never shows through behind the wave or track.
+	const auto sliderH = Core::App().settings().md3PlayerEnabled()
+		? height()
+		: st::mediaPlayerPlayback.fullWidth;
+	const auto sliderY = Core::App().settings().md3PlayerEnabled()
+		? 0
+		: (height() - sliderH);
 	_playbackSlider->setGeometry(
 		0,
-		height() - sliderH,
+		sliderY,
 		width(),
 		sliderH);
 
@@ -603,6 +612,9 @@ void Widget::updateControlsWrapVisibility() {
 }
 
 void Widget::paintEvent(QPaintEvent *e) {
+	// In MD3 mode the full-height slider child widget paints its own background,
+	// so we only need to fill the area not covered by the slider.
+	// In classic mode, fill the whole area as before.
 	auto p = QPainter(this);
 	auto fill = e->rect().intersected(
 		QRect(0, 0, width(), st::mediaPlayerHeight + st::lineWidth));
