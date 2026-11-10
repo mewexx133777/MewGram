@@ -216,7 +216,7 @@ jobs:
       - name: Archive libraries bundle for local development.
         if: (inputs.only_libs == true) || (env.UPLOAD_ARTIFACT == 'true') || (github.ref == 'refs/heads/nightly')
         run: |
-          7z a -tzip -mx=1 %TBUILD%\libs_bundle.zip %TBUILD%\Libraries %TBUILD%\ThirdParty
+          7z a -tzip -mx=1 %TBUILD%\libs_bundle.zip %TBUILD%\Libraries %TBUILD%\ThirdParty & if %errorlevel% leq 1 exit 0
         shell: cmd
 
       - name: Upload libraries bundle.
