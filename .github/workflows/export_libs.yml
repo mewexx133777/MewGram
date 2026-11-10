@@ -7,10 +7,14 @@ jobs:
   export:
     runs-on: windows-latest
     steps:
+      - name: Clone
+        uses: actions/checkout@v4
+
       - name: Prepare directories
         run: |
-          mkdir TBuild\Libraries
-          mkdir TBuild\ThirdParty
+          mkdir %userprofile%\TBuild\Libraries
+          mkdir %userprofile%\TBuild\ThirdParty
+          mklink /d %GITHUB_WORKSPACE%\TBuild %userprofile%\TBuild
         shell: cmd
 
       - name: ThirdParty cache
@@ -31,12 +35,12 @@ jobs:
 
       - name: Archive ThirdParty
         run: |
-          7z a -tzip -mx=1 thirdparty.zip TBuild\ThirdParty
+          7z a -tzip -mx=1 thirdparty.zip %userprofile%\TBuild\ThirdParty
         shell: cmd
 
       - name: Archive Libraries
         run: |
-          7z a -tzip -mx=1 libraries.zip TBuild\Libraries
+          7z a -tzip -mx=1 libraries.zip %userprofile%\TBuild\Libraries
         shell: cmd
 
       - name: Upload ThirdParty
