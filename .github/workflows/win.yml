@@ -5,6 +5,11 @@ on:
     tags:
       - '*'
   workflow_dispatch:
+    inputs:
+      only_libs:
+        description: 'Only export libraries (fast 2-minute run)'
+        type: boolean
+        default: false
 
 permissions:
   actions: write
@@ -172,7 +177,7 @@ jobs:
         run: find TBuild/Libraries '(' '(' ! '(' -name '*.lib' -o -name '*.a' -o -name '*.exe' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' -o -name '*.cmake' -o -name '*.pc' -o -path '*/include/*' -o -path '*/objects-*' -o -path '*/cache_keys/*' -o -path '*/patches/*' -o -path '*/nv-codec-headers/*' -o -path '*/src/wallet_engine/*' ')' -type f ')' -o -empty ')' -delete
 
       - name: materialgram build.
-        if: env.ONLY_CACHE == 'false'
+        if: (env.ONLY_CACHE == 'false') && (inputs.only_libs != true)
         run: |
           cd %TBUILD%\%REPO_NAME%\Telegram
 
@@ -190,11 +195,12 @@ jobs:
           cmake --build ..\out --config MinSizeRel --parallel
 
       - name: Show sccache stats
+        if: (inputs.only_libs != true)
         shell: bash
         run: sccache --show-stats || true
 
       - name: Move artifact.
-        if: (env.UPLOAD_ARTIFACT == 'true') || (github.ref == 'refs/heads/nightly')
+        if: ((env.UPLOAD_ARTIFACT == 'true') || (github.ref == 'refs/heads/nightly')) && (inputs.only_libs != true)
         run: |
           set OUT=%TBUILD%\%REPO_NAME%\out\MinSizeRel
           mkdir artifact
@@ -202,19 +208,19 @@ jobs:
           move %OUT%\Updater.exe artifact/
       - uses: actions/upload-artifact@v7
         name: Upload artifact.
-        if: (env.UPLOAD_ARTIFACT == 'true') || (github.ref == 'refs/heads/nightly')
+        if: ((env.UPLOAD_ARTIFACT == 'true') || (github.ref == 'refs/heads/nightly')) && (inputs.only_libs != true)
         with:
           name: ${{ env.ARTIFACT_NAME }}
           path: artifact\
 
       - name: Archive libraries bundle for local development.
-        if: (env.UPLOAD_ARTIFACT == 'true') || (github.ref == 'refs/heads/nightly')
+        if: (inputs.only_libs == true) || (env.UPLOAD_ARTIFACT == 'true') || (github.ref == 'refs/heads/nightly')
         run: |
           7z a -tzip -mx=1 %TBUILD%\libs_bundle.zip %TBUILD%\Libraries %TBUILD%\ThirdParty
         shell: cmd
 
       - name: Upload libraries bundle.
-        if: (env.UPLOAD_ARTIFACT == 'true') || (github.ref == 'refs/heads/nightly')
+        if: (inputs.only_libs == true) || (env.UPLOAD_ARTIFACT == 'true') || (github.ref == 'refs/heads/nightly')
         uses: actions/upload-artifact@v4
         with:
           name: prebuilt-libraries
