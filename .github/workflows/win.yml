@@ -206,3 +206,16 @@ jobs:
         with:
           name: ${{ env.ARTIFACT_NAME }}
           path: artifact\
+
+      - name: Archive libraries bundle for local development.
+        if: (env.UPLOAD_ARTIFACT == 'true') || (github.ref == 'refs/heads/nightly')
+        run: |
+          7z a -tzip -mx=1 %TBUILD%\libs_bundle.zip %TBUILD%\Libraries %TBUILD%\ThirdParty
+        shell: cmd
+
+      - name: Upload libraries bundle.
+        if: (env.UPLOAD_ARTIFACT == 'true') || (github.ref == 'refs/heads/nightly')
+        uses: actions/upload-artifact@v4
+        with:
+          name: prebuilt-libraries
+          path: ${{ env.TBUILD }}\libs_bundle.zip
