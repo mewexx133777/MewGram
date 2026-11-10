@@ -65,8 +65,6 @@ protected:
 		}
 
 		auto p = QPainter(this);
-		// Fill background first so no #272823 parent paint shows through gaps
-		p.fillRect(rect(), st::mediaPlayerBg);
 		PainterHighQualityEnabler hq(p);
 
 		const auto masterOpacity = fadeOpacity();
@@ -101,20 +99,24 @@ protected:
 			}
 		}
 
-		const auto centerY = float64(height()) - 5.0; // Align nicely near bottom
+		const auto centerY = float64(height()) / 2.0; // Vertically centered within slider bounds
 		const auto activeColor = disabled ? _st.disabledFg->c : _st.activeFg->c;
 		const auto inactiveColor = _st.inactiveFg->c;
 
-		// 1. Draw straight Track with gap
-		const auto gapSize = 5.0;
-		const auto trackStart = mid + gapSize;
-		const auto stopDotRadius = 2.5;
+		const auto handleWidth = 4.0;
+		const auto handleHeight = 10.0 + (over * 1.5);
+		const auto halfHandle = handleWidth / 2.0;
+		const auto gapSize = 5.0; // Clean Material 3 gap on both sides of the handle
+
+		// 1. Draw Inactive Track (grey line on right, starts AFTER handle + gap)
+		const auto trackStart = mid + halfHandle + gapSize;
+		const auto stopDotRadius = 2.0;
 		const auto trackEnd = end - (stopDotRadius * 2.0 + 3.0);
 
 		if (trackEnd > trackStart + 2.0) {
 			p.setOpacity(masterOpacity * (0.35 + 0.65 * over));
 			QPen trackPen(inactiveColor);
-			trackPen.setWidthF(3.5);
+			trackPen.setWidthF(3.0);
 			trackPen.setCapStyle(Qt::RoundCap);
 			p.setPen(trackPen);
 			p.setBrush(Qt::NoBrush);
@@ -129,40 +131,47 @@ protected:
 			p.drawEllipse(QPointF(end - stopDotRadius - 1.0, centerY), stopDotRadius, stopDotRadius);
 		}
 
-		// 2. Draw Active Wavy Segment (10dp peak-to-peak amplitude = 5.0px wave amplitude)
-		if (mid > from + 1.0) {
+		// 2. Draw Active Wavy Segment (ends BEFORE handle - gap)
+		const auto waveEnd = std::max(from, mid - halfHandle - gapSize);
+		if (waveEnd > from + 1.0) {
 			p.setOpacity(masterOpacity);
 			QPen wavePen(activeColor);
-			wavePen.setWidthF(3.6);
+			wavePen.setWidthF(3.2);
 			wavePen.setCapStyle(Qt::RoundCap);
 			wavePen.setJoinStyle(Qt::RoundJoin);
 			p.setPen(wavePen);
 			p.setBrush(Qt::NoBrush);
 
-			// Material Design 3 wavelength and base amplitude (10dp expressive)
+			// Material Design 3 wavelength and smoother base amplitude
 			const auto wavelength = 36.0;
-			const auto baseAmplitude = 4.8; // ~10dp peak-to-peak
+			const auto baseAmplitude = 3.2;
 
-			// Smooth edge tapering so wave connects seamlessly to origin and handle
+			// Smooth edge tapering so wave connects seamlessly to origin
 			auto ampFactor = 1.0;
-			if (value < 0.12) {
-				ampFactor = std::max(0.0, value / 0.12);
-			} else if (value > 0.92) {
-				ampFactor = std::max(0.0, (1.0 - value) / 0.08);
+			if (value < 0.08) {
+				ampFactor = std::max(0.0, value / 0.08);
+			} else if (value > 0.94) {
+				ampFactor = std::max(0.0, (1.0 - value) / 0.06);
 			}
 
 			// Combined amplitude with play/pause transition animation
 			const auto amplitude = baseAmplitude * ampFactor * _currentAmpProgress;
 
-			if (amplitude < 0.2 || (mid - from) < 6.0) {
-				p.drawLine(QPointF(from, centerY), QPointF(mid, centerY));
+			if (amplitude < 0.2 || (waveEnd - from) < 6.0) {
+				p.drawLine(QPointF(from, centerY), QPointF(waveEnd, centerY));
 			} else {
 				QPainterPath path;
-				const auto steps = std::max(12, int((mid - from) / 1.5));
+				const auto steps = std::max(30, int((waveEnd - from) * 2.0));
 				for (int i = 0; i <= steps; ++i) {
-					const auto px = from + (mid - from) * (float64(i) / steps);
-					const auto sinVal = std::sin((2.0 * 3.1415926535 * (px - from - _wavePhase)) / wavelength);
-					const auto py = centerY + amplitude * sinVal;
+					const auto px = from + (waveEnd - from) * (float64(i) / steps);
+					const auto sinVal = std::sin((2.0 * 3.14159265358979323846 * (px - from - _wavePhase)) / wavelength);
+
+					// Smoothly taper amplitude to 0 at the very end of the wave (last 8px)
+					// so the wave smoothly glides into the gap before the handle
+					const auto distFromEnd = waveEnd - px;
+					const auto endTaper = (distFromEnd < 8.0) ? (distFromEnd / 8.0) : 1.0;
+
+					const auto py = centerY + (amplitude * endTaper) * sinVal;
 					if (i == 0) {
 						path.moveTo(px, py);
 					} else {
@@ -173,15 +182,13 @@ protected:
 			}
 		}
 
-		// 3. Material Design 3 Pill handle
+		// 3. Material Design 3 Pill handle (rounded bar between left wave and right track)
 		{
 			p.setOpacity(masterOpacity);
 			p.setPen(Qt::NoPen);
 			p.setBrush(activeColor);
-			const auto handleWidth = 4.0 + (over * 2.0);
-			const auto handleHeight = 12.0 + (over * 3.0);
-			const auto handleRect = QRectF(mid - handleWidth / 2.0, centerY - handleHeight / 2.0, handleWidth, handleHeight);
-			p.drawRoundedRect(handleRect, handleWidth / 2.0, handleWidth / 2.0);
+			const auto handleRect = QRectF(mid - halfHandle, centerY - handleHeight / 2.0, handleWidth, handleHeight);
+			p.drawRoundedRect(handleRect, halfHandle, halfHandle);
 		}
 
 		// Continuous animation while playing OR while transition is in progress
@@ -257,6 +264,11 @@ Widget::Widget(
 
 	_nameLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
 	_timeLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
+
+	if (Core::App().settings().md3PlayerEnabled()) {
+		_shadow->hide();
+	}
+	_playbackSlider->lower();
 
 	_playbackProgress->setInLoadingStateChangedCallback([=](bool loading) {
 		_playbackSlider->setDisabled(loading);
@@ -485,10 +497,17 @@ void Widget::stopAndClose() {
 
 void Widget::setShadowGeometryToLeft(int x, int y, int w, int h) {
 	_shadow->setGeometryToLeft(x, y, w, h);
+	if (Core::App().settings().md3PlayerEnabled()) {
+		_shadow->hide();
+	}
 }
 
 void Widget::showShadowAndDropdowns() {
-	_shadow->show();
+	if (!Core::App().settings().md3PlayerEnabled()) {
+		_shadow->show();
+	} else {
+		_shadow->hide();
+	}
 	_playbackSlider->show();
 	if (_volumeHidden) {
 		_volumeHidden = false;
@@ -579,14 +598,9 @@ void Widget::updateControlsGeometry() {
 
 	updatePlayPrevNextPositions();
 
-	// In MD3 mode the slider covers the full player widget so the parent background
-	// (#272823) never shows through behind the wave or track.
-	const auto sliderH = Core::App().settings().md3PlayerEnabled()
-		? height()
-		: st::mediaPlayerPlayback.fullWidth;
-	const auto sliderY = Core::App().settings().md3PlayerEnabled()
-		? 0
-		: (height() - sliderH);
+	const auto md3 = Core::App().settings().md3PlayerEnabled();
+	const auto sliderH = md3 ? 14 : st::mediaPlayerPlayback.fullWidth;
+	const auto sliderY = height() - sliderH;
 	_playbackSlider->setGeometry(
 		0,
 		sliderY,
@@ -612,9 +626,6 @@ void Widget::updateControlsWrapVisibility() {
 }
 
 void Widget::paintEvent(QPaintEvent *e) {
-	// In MD3 mode the full-height slider child widget paints its own background,
-	// so we only need to fill the area not covered by the slider.
-	// In classic mode, fill the whole area as before.
 	auto p = QPainter(this);
 	auto fill = e->rect().intersected(
 		QRect(0, 0, width(), st::mediaPlayerHeight + st::lineWidth));
